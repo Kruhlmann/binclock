@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     return 0;
   }
   int fbfd = open(argv[1], O_RDWR);
-  struct fb_fix_screeninfo fix_info;
+  struct screeninfo screen;
 
   if (fbfd == -1) {
     fprintf(stderr, "Unable to open device '%s'", DEVICE_PATH);
@@ -38,13 +38,13 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  if (ioctl(fbfd, FBIOGET_FSCREENINFO, &fix_info) == -1) {
+  if (ioctl(fbfd, FBIOGET_FSCREENINFO, &screen) == -1) {
     perror("Unable to open RPI Sense");
     close(fbfd);
     exit(EXIT_FAILURE);
   }
 
-  ensure_rpi_sense_exists(fix_info.id, fbfd);
+  ensure_rpi_sense_exists(screen.id, fbfd);
   uint16_t *map = allocate_map_memory(fbfd);
   show_map_loading(map);
 
