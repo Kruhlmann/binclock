@@ -24,11 +24,14 @@ void show_map_loading(uint16_t *map);
 void ensure_rpi_sense_exists(char *id, int device);
 uint16_t *allocate_map_memory(int device);
 
-int main() {
-  int fbfd;
+int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    printf("Usage: binclock <device>\n");
+    return 0;
+  }
+  int fbfd = open(argv[1], O_RDWR);
   struct fb_fix_screeninfo fix_info;
 
-  fbfd = open(DEVICE_PATH, O_RDWR);
   if (fbfd == -1) {
     fprintf(stderr, "Unable to open device '%s'", DEVICE_PATH);
     perror("");

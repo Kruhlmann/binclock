@@ -2,4 +2,8 @@
 
 Binary clock for the Raspberry Pi Sense
 
-Program relies on the `/dev/fb0` device, change in source if the device is different.
+## Usage
+
+`binclock <device>`
+
+Default sense device on a raspberry pi is typically `/dev/fb0` or `/dev/fb1`;
