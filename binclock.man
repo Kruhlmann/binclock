@@ -1,0 +1,18 @@
+.TH man 1 "11 November 2021" "1.0" "binclock man page"
+.SH NAME
+binclock \- Raspberry Pi Sense binary clock
+.SH SYNOPSIS
+binclock <output_device> <input_device>
+.SH DESCRIPTION
+binclock displays a binary time representation on the Raspberry Pi Sense LED display. Formats can be changed using the joystick.
+.SH OPTIONS
+.TP
+output_device
+Raspberry Pi Sense output device location. Default on raspian is /dev/fb0.
+.TP
+input_device
+Raspberry Pi Sense input device location. Default on raspian is /dev/input/event2.
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+Andreas Kruhlmann (andreas@kruhlmann.dev)

@@ -1,5 +1,10 @@
+#include <binclock.h>
+#include <render.h>
+
 #include <fcntl.h>
 #include <linux/fb.h>
+#include <math.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,78 +13,129 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 
-#define LOAD_DELAY 6
-#define DEVICE_PATH "/dev/fb0"
-#define WORD_W 8
-#define WORD_H 8
-#define NUM_WORDS WORD_W *WORD_H
-#define FILESIZE (NUM_WORDS * sizeof(uint16_t))
+uint16_t *map;
+struct fb_fix_screeninfo screen;
+time_t now;
+struct tm *now_tm;
 
-void delay(int);
-void clear_map(uint16_t *map);
-void show_map_loading(uint16_t *map);
-void ensure_rpi_sense_exists(char *id, int device);
-uint16_t *allocate_map_memory(int device);
-
-int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    printf("Usage: binclock <device>\n");
-    return 0;
+void verify_argc(int argc) {
+  if (argc != 3) {
+    printf("Usage: binclock <output_output_device> <input_device>\n");
+    exit(0);
   }
-  int fbfd = open(argv[1], O_RDWR);
-  struct screeninfo screen;
+}
 
-  if (fbfd == -1) {
-    fprintf(stderr, "Unable to open device '%s'", DEVICE_PATH);
+int get_rpi_output_device(char* path) {
+  int output_device = open(path, O_RDWR);
+
+  if (output_device == -1) {
+    fprintf(stderr, "Unable to open output device '%s'", path);
     perror("");
     exit(EXIT_FAILURE);
   }
 
-  if (ioctl(fbfd, FBIOGET_FSCREENINFO, &screen) == -1) {
+  if (ioctl(output_device, FBIOGET_FSCREENINFO, &screen) == -1) {
     perror("Unable to open RPI Sense");
-    close(fbfd);
+    close(output_device);
     exit(EXIT_FAILURE);
   }
+  return output_device;
+}
 
-  ensure_rpi_sense_exists(screen.id, fbfd);
-  uint16_t *map = allocate_map_memory(fbfd);
+FILE* get_rpi_input_device(char* path) {
+    return fopen(path, "r");
+}
+
+uint8_t read_directions(FILE* input_device) {
+    uint8_t directions = 0;
+    char input_buffer[INPUT_DEV_LEN];
+    fgets(input_buffer, INPUT_DEV_LEN, input_device);
+    char direction_key = input_buffer[RPI_INPUT_DIRECTION_IDX];
+    
+    if (direction_key == RPI_INPUT_UP) { directions |= 1; }
+    if (direction_key == RPI_INPUT_RIGHT) { directions |= 2; }
+    if (direction_key == RPI_INPUT_DOWN) { directions |= 4; }
+    if (direction_key == RPI_INPUT_LEFT) { directions |= 8; }
+    return directions;
+}
+
+void set_clock_mode(short* clock_mode, uint8_t directions, uint8_t last_directions) {
+    if (GETBIT(directions, 0) == 1 && GETBIT(last_directions, 0) == 0) {
+        *clock_mode *= -1;
+    }
+    if (GETBIT(directions, 2) == 1 && GETBIT(last_directions, 2) == 0) {
+        *clock_mode *= -1;
+    }
+}
+
+void set_clock_format(short* clock_format, uint8_t directions, uint8_t last_directions) {
+    if (GETBIT(directions, 1) == 1 && GETBIT(last_directions, 1) == 0) {
+        *clock_format *= -1;
+    }
+    if (GETBIT(directions, 3) == 1 && GETBIT(last_directions, 3) == 0) {
+        *clock_format *= -1;
+    }
+}
+
+int main(int argc, char *argv[]) {
+  verify_argc(argc);
+
+  int output_device = get_rpi_output_device(argv[1]);
+  FILE* input_device = get_rpi_input_device(argv[2]);
+
+  ensure_rpi_sense_exists(screen.id, output_device);
+  map = allocate_map_memory(output_device);
   show_map_loading(map);
 
+  /* signal(SIGINT, setup_sigint_handler); */
+  /* slide_string("retrats temmargorP", 15, COLOR_MINUTES); */
+
+  uint8_t last_directions = 0;
+  short clock_mode = CLOCK_MODE_DOUBLE;
+  short clock_format = CLOCK_FORMAT_24;
+
   while (1) {
-    time_t now;
-    struct tm *now_tm;
+    uint8_t directions = read_directions(input_device);
+    set_clock_mode(&clock_mode, directions, last_directions);
+    set_clock_format(&clock_format, directions, last_directions);
+    last_directions = directions;
+
     now = time(NULL);
     now_tm = localtime(&now);
 
-    for (char i = 0; i < 8; i++) {
-      *(map + i + WORD_W * 0) = ((now_tm->tm_hour >> i) & 0x01) * 0xF800;
+    clear_map(map);
+    if (clock_mode == CLOCK_MODE_DOUBLE) {
+        render_6_row_clock(map, now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec, clock_format);
+    } else {
+        render_3_col_clock(map, now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec, clock_format);
     }
-    for (char i = 0; i < 8; i++) {
-      *(map + i + WORD_W * 1) = ((now_tm->tm_min >> i) & 0x01) * 0xF80;
-    }
-    for (char i = 0; i < 8; i++) {
-      *(map + i + WORD_W * 2) = ((now_tm->tm_sec >> i) & 0x01) * 0xF0F;
-    }
-    delay(100);
   }
 }
 
-void ensure_rpi_sense_exists(char *id, int device) {
+void setup_sigint_handler(int sig) {
+  slide_string(map, "reppots temmargorP", 15, COLOR_SECONDS);
+  signal(sig, SIG_IGN);
+  exit(0);
+}
+
+
+void ensure_rpi_sense_exists(char *id, int output_device) {
   if (strcmp(id, "RPi-Sense FB") != 0) {
     printf("%s\n", "Error: RPi-Sense FB not found");
-    close(device);
+    close(output_device);
     exit(EXIT_FAILURE);
   }
 }
 
-uint16_t *allocate_map_memory(int device) {
-  uint16_t *map =
-      mmap(NULL, FILESIZE, PROT_READ | PROT_WRITE, MAP_SHARED, device, 0);
+uint16_t *allocate_map_memory(int output_device) {
+  uint16_t *map = mmap(NULL, FILESIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+                       output_device, 0);
   if (map == MAP_FAILED) {
-    close(device);
+    close(output_device);
     perror("Error during map allocation");
     exit(EXIT_FAILURE);
   }
@@ -88,16 +144,3 @@ uint16_t *allocate_map_memory(int device) {
 
 void delay(int ms) { usleep(ms * 1000); }
 
-void show_map_loading(uint16_t *map) {
-  for (int i = 0; i < NUM_WORDS; i++) {
-    *(map + i) = 0xF800;
-    delay(LOAD_DELAY);
-  }
-  clear_map(map);
-}
-
-void clear_map(uint16_t *map) {
-  for (int i = 0; i < NUM_WORDS; i++) {
-    *(map + i) = 0;
-  }
-}

@@ -1,0 +1,6 @@
+[Unit]
+Name=binclock
+Description=Binary clock for the Raspberry Pi Sense
+
+[Install]
+Target=multi.user
