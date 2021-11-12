@@ -1,5 +1,5 @@
-#include <binclock.h>
 #include <render.h>
+#include <binclock.h>
 
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -173,8 +173,7 @@ void render_char(char character, uint16_t *map, int dx, unsigned int color) {
   }
 }
 
-void slide_string(uint16_t *map, char *string, unsigned int interval,
-                  unsigned int color) {
+void slide_string(uint16_t *map, char *string, unsigned int interval, unsigned int color) {
   clear_map(map);
   int dx = -1 * WORD_W * strlen(string);
   while (dx <= 8) {
@@ -198,10 +197,9 @@ void blit(uint16_t *map, int y, int x, unsigned int color) {
   }
 }
 
-void render_6_row_clock(uint16_t *map, int hours, int minutes, int seconds,
-                        short format) {
+void render_6_row_clock(uint16_t *map, int hours, int minutes, int seconds, short format) {
   if (format == CLOCK_FORMAT_12 && hours > 12) {
-    hours -= 12;
+      hours -= 12;
   }
   for (unsigned char i = 0; i < 4; i++) {
     unsigned char offset = WORD_W * i;
@@ -214,13 +212,9 @@ void render_6_row_clock(uint16_t *map, int hours, int minutes, int seconds,
   }
 }
 
-void render_3_col_clock(uint16_t *map, int hours, int minutes, int seconds,
-                        short format) {
+void render_3_col_clock(uint16_t *map, int hours, int minutes, int seconds, short format) {
   if (format == CLOCK_FORMAT_12 && hours > 12) {
-id render_3_col_clock(uint16_t *map, int hours, int minutes, int seconds,
-                        short format) {
-  if (format == CLOCK_FORMAT_12 && hours > 12) {
-    hours -= 12;
+      hours -= 12;
   }
   for (unsigned char i = 0; i < 8; i++) {
     unsigned char offset = WORD_W * i;

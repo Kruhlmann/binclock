@@ -1,10 +1,10 @@
 .TH man 1 "11 November 2021" "1.0" "binclock man page"
 .SH NAME
-binclock \- Raspberry Pi Sense binary clock
+binclock \- RPI Sense binary clock
 .SH SYNOPSIS
 binclock <output_device> <input_device>
 .SH DESCRIPTION
-binclock displays a binary time representation on the Raspberry Pi Sense LED display. Formats can be changed using the joystick.
+binclock displays a binary time representation on the RPI Sense LED display. Formats can be changed using the joystick.
 .SH OPTIONS
 .TP
 output_device
