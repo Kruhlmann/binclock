@@ -99,6 +99,7 @@ void input_loop() {
     set_clock_mode(&clock_mode, directions, last_directions);
     set_clock_format(&clock_format, directions, last_directions);
     last_directions = directions;
+    delay(20);
   }
 }
 
@@ -117,6 +118,7 @@ void render_loop() {
       render_3_col_clock(map, now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec,
                          clock_format);
     }
+    delay(300);
   }
 }
 

@@ -45,4 +45,4 @@ uninstall:
 	sudo systemctl daemon-reload
 	sudo mandb
 
-.PHONY: clean uninstall
+.PHONY: clean uninstall test
