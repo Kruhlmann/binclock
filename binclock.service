@@ -1,6 +1,11 @@
 [Unit]
-Name=binclock
 Description=Binary clock for the Raspberry Pi Sense
 
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/usr/bin/binclock /dev/fb0 /dev/input/event2
+
 [Install]
-Target=multi.user
+WantedBy=multi-user.target

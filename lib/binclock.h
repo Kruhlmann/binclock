@@ -38,6 +38,8 @@ void read_rpi_input(FILE* device);
 void verify_argc(int argc);
 void set_clock_mode(short* clock_mode, uint8_t directions, uint8_t last_directions);
 void set_clock_format(short* clock_format, uint8_t directions, uint8_t last_directions);
+void render_loop();
+void input_loop();
 int get_rpi_output_device(char* path);
 uint16_t *allocate_map_memory(int device);
 FILE* get_rpi_input_device(char* path);

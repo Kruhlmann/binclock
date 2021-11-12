@@ -2,8 +2,9 @@
 #include <render.h>
 
 #include <fcntl.h>
-#include <linux/fb.h>
 #include <math.h>
+#include <pthread.h>
+#include <linux/fb.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -19,8 +20,10 @@
 
 uint16_t *map;
 struct fb_fix_screeninfo screen;
-time_t now;
-struct tm *now_tm;
+short clock_mode = CLOCK_MODE_DOUBLE;
+short clock_format = CLOCK_FORMAT_24;
+int output_device;
+FILE *input_device;
 
 void verify_argc(int argc) {
   if (argc != 3) {
@@ -29,7 +32,7 @@ void verify_argc(int argc) {
   }
 }
 
-int get_rpi_output_device(char* path) {
+int get_rpi_output_device(char *path) {
   int output_device = open(path, O_RDWR);
 
   if (output_device == -1) {
@@ -46,74 +49,95 @@ int get_rpi_output_device(char* path) {
   return output_device;
 }
 
-FILE* get_rpi_input_device(char* path) {
-    return fopen(path, "r");
+FILE *get_rpi_input_device(char *path) { return fopen(path, "r"); }
+
+uint8_t read_directions(FILE *input_device) {
+  uint8_t directions = 0;
+  char input_buffer[INPUT_DEV_LEN];
+  fgets(input_buffer, INPUT_DEV_LEN, input_device);
+  char direction_key = input_buffer[RPI_INPUT_DIRECTION_IDX];
+
+  if (direction_key == RPI_INPUT_UP) {
+    directions |= 1;
+  }
+  if (direction_key == RPI_INPUT_RIGHT) {
+    directions |= 2;
+  }
+  if (direction_key == RPI_INPUT_DOWN) {
+    directions |= 4;
+  }
+  if (direction_key == RPI_INPUT_LEFT) {
+    directions |= 8;
+  }
+  return directions;
 }
 
-uint8_t read_directions(FILE* input_device) {
-    uint8_t directions = 0;
-    char input_buffer[INPUT_DEV_LEN];
-    fgets(input_buffer, INPUT_DEV_LEN, input_device);
-    char direction_key = input_buffer[RPI_INPUT_DIRECTION_IDX];
-    
-    if (direction_key == RPI_INPUT_UP) { directions |= 1; }
-    if (direction_key == RPI_INPUT_RIGHT) { directions |= 2; }
-    if (direction_key == RPI_INPUT_DOWN) { directions |= 4; }
-    if (direction_key == RPI_INPUT_LEFT) { directions |= 8; }
-    return directions;
+void set_clock_mode(short *clock_mode, uint8_t directions,
+                    uint8_t last_directions) {
+  if (GETBIT(directions, 0) == 1 && GETBIT(last_directions, 0) == 0) {
+    *clock_mode *= -1;
+  }
+  if (GETBIT(directions, 2) == 1 && GETBIT(last_directions, 2) == 0) {
+    *clock_mode *= -1;
+  }
 }
 
-void set_clock_mode(short* clock_mode, uint8_t directions, uint8_t last_directions) {
-    if (GETBIT(directions, 0) == 1 && GETBIT(last_directions, 0) == 0) {
-        *clock_mode *= -1;
-    }
-    if (GETBIT(directions, 2) == 1 && GETBIT(last_directions, 2) == 0) {
-        *clock_mode *= -1;
-    }
+void set_clock_format(short *clock_format, uint8_t directions,
+                      uint8_t last_directions) {
+  if (GETBIT(directions, 1) == 1 && GETBIT(last_directions, 1) == 0) {
+    *clock_format *= -1;
+  }
+  if (GETBIT(directions, 3) == 1 && GETBIT(last_directions, 3) == 0) {
+    *clock_format *= -1;
+  }
 }
 
-void set_clock_format(short* clock_format, uint8_t directions, uint8_t last_directions) {
-    if (GETBIT(directions, 1) == 1 && GETBIT(last_directions, 1) == 0) {
-        *clock_format *= -1;
-    }
-    if (GETBIT(directions, 3) == 1 && GETBIT(last_directions, 3) == 0) {
-        *clock_format *= -1;
-    }
-}
-
-int main(int argc, char *argv[]) {
-  verify_argc(argc);
-
-  int output_device = get_rpi_output_device(argv[1]);
-  FILE* input_device = get_rpi_input_device(argv[2]);
-
-  ensure_rpi_sense_exists(screen.id, output_device);
-  map = allocate_map_memory(output_device);
-  show_map_loading(map);
-
-  /* signal(SIGINT, setup_sigint_handler); */
-  /* slide_string("retrats temmargorP", 15, COLOR_MINUTES); */
-
+void input_loop() {
   uint8_t last_directions = 0;
-  short clock_mode = CLOCK_MODE_DOUBLE;
-  short clock_format = CLOCK_FORMAT_24;
-
   while (1) {
     uint8_t directions = read_directions(input_device);
     set_clock_mode(&clock_mode, directions, last_directions);
     set_clock_format(&clock_format, directions, last_directions);
     last_directions = directions;
+  }
+}
 
+void render_loop() {
+time_t now;
+struct tm *now_tm;
+  while (1) {
     now = time(NULL);
     now_tm = localtime(&now);
 
     clear_map(map);
     if (clock_mode == CLOCK_MODE_DOUBLE) {
-        render_6_row_clock(map, now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec, clock_format);
+      render_6_row_clock(map, now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec,
+                         clock_format);
     } else {
-        render_3_col_clock(map, now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec, clock_format);
+      render_3_col_clock(map, now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec,
+                         clock_format);
     }
   }
+}
+
+int main(int argc, char *argv[]) {
+  verify_argc(argc);
+  signal(SIGINT, setup_sigint_handler);
+
+  pthread_t input_thread;
+  pthread_t render_thread;
+  output_device = get_rpi_output_device(argv[1]);
+  input_device = get_rpi_input_device(argv[2]);
+
+  ensure_rpi_sense_exists(screen.id, output_device);
+  map = allocate_map_memory(output_device);
+  show_map_loading(map);
+  slide_string(map, "retrats temmargorP", 15, COLOR_MINUTES);
+
+  pthread_create(&input_thread, NULL, input_loop, NULL);
+  pthread_create(&render_thread, NULL, render_loop, NULL);
+  pthread_join(input_thread, NULL);
+  pthread_join(render_thread, NULL);
 }
 
 void setup_sigint_handler(int sig) {
@@ -121,7 +145,6 @@ void setup_sigint_handler(int sig) {
   signal(sig, SIG_IGN);
   exit(0);
 }
-
 
 void ensure_rpi_sense_exists(char *id, int output_device) {
   if (strcmp(id, "RPi-Sense FB") != 0) {
@@ -143,4 +166,3 @@ uint16_t *allocate_map_memory(int output_device) {
 }
 
 void delay(int ms) { usleep(ms * 1000); }
-

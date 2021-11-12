@@ -1,5 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Wno-unknown-pragmas -pedantic -O3 -g3 -ggdb -Ilib/
+CFLAGS_LIB = -lpthread
 
 SRC = $(shell find src/ -type f -name '*.c')
 HEADERS = $(shell find lib/ -type f -name '*.h')
@@ -10,7 +11,7 @@ SERVICE_TARGET = $(TARGET).service
 all: $(TARGET)
 
 test:
-	@echo "testing is unavailable in gcc."
+	@echo "testing is unavailable."
 
 %.1: %.man
 	groff -Tascii -man $< > $@
@@ -22,7 +23,7 @@ obj/%.o: src/%.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(TARGET): $(SRC_OBJ) $(HEADERS) Makefile
-	$(CC) $(XFLAGS) -o $@ $(TST_OBJ) $(SRC_OBJ)
+	$(CC) $(XFLAGS) -o $@ $(TST_OBJ) $(SRC_OBJ) $(CFLAGS_LIB) 
 
 clean:
 	rm -rf $(SRC_OBJ) $(TST_OBJ) $(PROGRAM)
@@ -30,11 +31,18 @@ clean:
 install: $(TARGET) $(SERVICE_TARGET) $(TARGET).1
 	sudo cp -f $(TARGET) /usr/bin/$(TARGET)
 	sudo cp -f $(SERVICE_TARGET) /etc/systemd/system/$(SERVICE_TARGET)
+	sudo systemctl daemon-reload
+	sudo systemctl enable --now $(TARGET).service
+	sudo systemctl restart $(TARGET).service
 	sudo cp -f $(TARGET).1 /usr/share/man/man1/$(TARGET).1
 	sudo mandb
 
 uninstall:
-	sudo rm -f $(INSTALL_TARGET)
-	sudo rm -f $(INSTALL_SERVICE_TARGET)
+	sudo systemctl disable --now $(TARGET).service
+	sudo rm -f /usr/bin/$(TARGET)
+	sudo rm -f /etc/systemd/system/$(SERVICE_TARGET)
+	sudo rm -f /usr/share/man/man1/$(TARGET).1
+	sudo systemctl daemon-reload
+	sudo mandb
 
-.PHONY: clean
+.PHONY: clean uninstall
