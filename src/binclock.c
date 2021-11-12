@@ -2,9 +2,9 @@
 #include <render.h>
 
 #include <fcntl.h>
+#include <linux/fb.h>
 #include <math.h>
 #include <pthread.h>
-#include <linux/fb.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -103,8 +103,8 @@ void input_loop() {
 }
 
 void render_loop() {
-time_t now;
-struct tm *now_tm;
+  time_t now;
+  struct tm *now_tm;
   while (1) {
     now = time(NULL);
     now_tm = localtime(&now);
