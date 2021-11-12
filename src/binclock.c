@@ -123,6 +123,7 @@ struct tm *now_tm;
 int main(int argc, char *argv[]) {
   verify_argc(argc);
   signal(SIGINT, setup_sigint_handler);
+  signal(SIGTERM, setup_sigint_handler);
 
   pthread_t input_thread;
   pthread_t render_thread;
